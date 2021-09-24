@@ -8,13 +8,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import androidx.databinding.DataBindingUtil
+import com.deeply.samples.eventdetection.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
+    private lateinit var binding: ActivityMainBinding
 
     private val requestRecordPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -26,19 +25,33 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
+        binding.lifecycleOwner = this
+        binding.viewModel = viewModel
 
-        startRecording()
+        initListeners()
     }
 
-    private fun startRecording() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED) {
-            requestRecordPermission.launch(Manifest.permission.RECORD_AUDIO)
+    private fun initListeners() {
+        binding.start.setOnClickListener {
+            toggleAnalyzing()
+        }
+        binding.result.setOnClickListener {
+            viewModel.getResult(null, null)
+        }
+    }
+
+    private fun toggleAnalyzing() {
+        if (viewModel.isAnalyzing()) {
+            viewModel.stopAnalyzing()
+            binding.start.text = "Start"
         } else {
-            val scope = CoroutineScope(Job() + Dispatchers.Default)
-            scope.launch {
-                viewModel.analyze()
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+                requestRecordPermission.launch(Manifest.permission.RECORD_AUDIO)
+            } else {
+                viewModel.startAnalyzing()
+                binding.start.text = "Stop"
             }
         }
     }
