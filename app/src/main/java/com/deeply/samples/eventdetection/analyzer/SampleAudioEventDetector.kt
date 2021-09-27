@@ -14,6 +14,11 @@ import java.io.IOException
 import java.util.*
 import kotlin.random.Random
 
+/**
+ * 오디오 분석 모듈의 샘플 구현.
+ * 이 버전은 샘플 버전으로, 작동 방식을 확인하기 위한 목적으로 작성되었기 때문에 실제로 오디오 분석을 진행하지는 않습니다.
+ * 모델 파일이 현재는 포함되어 있지 않기 때문에 로딩하는 과정에서 exception이 발생하나, 샘플 모듈의 작동에는 영향을 주지 않습니다.
+ */
 class SampleAudioEventDetector(application: Application): AudioEventDetector {
     private val app = application
     private var moduleEncoder: Module? = null

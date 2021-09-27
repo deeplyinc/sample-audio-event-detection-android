@@ -1,3 +1,19 @@
-## Deeply Audio Event Detection Sample App for Android
+## 오디오 이벤트 분석 샘플 앱
 
-A sample app for audio event detection
+오디오 이벤트를 분석 및 감지하는 샘플 앱 입니다.
+앱을 만드실 때 저희가 제공드릴 오디오 이벤트 분석 모듈을 어떤 방식으로 사용하면 되는지 참고하실 수 있도록 만든 버전입니다.
+오디오 이벤트 분석 모듈과 녹음 모듈로 구성되어 있으며, .analyzer 패키지 내에 존재하는 분석 모듈이 핵심입니다.
+샘플앱에서는 AudioEventDetector 인터페이스를 통해 어떤 메소드를 사용하시면 되는지 확인하실 수 있습니다.
+녹음 모듈의 경우 코드의 간소화를 위해 분리해놓은 것으로 다른 방식으로 구현하거나 외부 라이브러리를 사용하셔도 상관없습니다.
+
+아직 실제로 이벤트 분석 및 감지 기능이 작동하지는 않지만, 분석을 위해 반드시 필요한 최소한의 dependency 는 포함시켜 놓았습니다.
+
+```
+// PyTorch Lite
+implementation "org.pytorch:pytorch_android_lite:1.9.0"
+
+// Apache Commons Math
+implementation "org.apache.commons:commons-math3:3.6.1"
+```
+
+오디오 이벤트 감지 딥러닝 모델 파일이 포함되어있지 않기 때문에 모델 로딩 과정에서 exception 이 발생하나, 샘플 앱의 작동에는 영향을 미치지 않습니다.

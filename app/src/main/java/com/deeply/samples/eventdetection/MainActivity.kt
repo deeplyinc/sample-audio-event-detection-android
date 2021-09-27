@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.databinding.DataBindingUtil
 import com.deeply.samples.eventdetection.databinding.ActivityMainBinding
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -37,20 +38,23 @@ class MainActivity : AppCompatActivity() {
             toggleAnalyzing()
         }
         binding.result.setOnClickListener {
-            viewModel.getResult(null, null)
+            val beforeTenMinute = Calendar.getInstance()
+            beforeTenMinute.add(Calendar.MINUTE, -10)
+            val now = Calendar.getInstance()
+            viewModel.getResult(from = beforeTenMinute, to = now)
         }
     }
 
     private fun toggleAnalyzing() {
         if (viewModel.isAnalyzing()) {
-            viewModel.stopAnalyzing()
+            viewModel.stopAnalyzing() // 오디오 녹음 및 분석 종료
             binding.start.text = "Start"
         } else {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
                 requestRecordPermission.launch(Manifest.permission.RECORD_AUDIO)
             } else {
-                viewModel.startAnalyzing()
+                viewModel.startAnalyzing() // 오디오 녹음 및 분석 시작
                 binding.start.text = "Stop"
             }
         }
