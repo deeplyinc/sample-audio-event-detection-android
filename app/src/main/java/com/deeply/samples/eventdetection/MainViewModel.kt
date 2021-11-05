@@ -9,6 +9,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.deeply.samples.eventdetection.analyzer.AudioEvent
 import com.deeply.samples.eventdetection.analyzer.AudioEventDetector
+import com.deeply.samples.eventdetection.analyzer.HomeAudioEventDetector
 import com.deeply.samples.eventdetection.analyzer.SampleAudioEventDetector
 import com.deeply.samples.eventdetection.recorder.DeeplyRecorder
 import kotlinx.coroutines.Dispatchers
@@ -21,13 +22,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 녹음 모듈. AudioRecord 를 Kotlin Flow 로 사용할 수 있도록 감싼 wrapper 로, 이 모듈을 사용하지 않아도 상관없습니다.
      * AudioEventDetector 가 FloatArray 형태의 raw audio 를 인풋으로 받는 형태이기 때문에 이것만 맞춰주시면 됩니다.
      */
-    private val recorder = DeeplyRecorder(bufferSize = 16000)
+    private val recorder = DeeplyRecorder(bufferSize = 48000)
     /**
      * 녹음된 raw audio 데이터 기반으로 오디오 이벤트를 분석, 감지하는 모듈. accumulate() 함수를 이용해 raw audio 를
      * 인풋으로 받고, 충분한 오디오 데이터가 모일 경우 분석을 진행하여 그 결과를 모듈 내부에서 관리합니다. getResults() 함수를
      * 이용해 분석 결과를 List<AudioEvent> 형태로 얻을 수 있습니다.
      */
-    private val detector: AudioEventDetector = SampleAudioEventDetector(application)
+//    private val detector: AudioEventDetector = SampleAudioEventDetector(application)
+    private val detector: AudioEventDetector = HomeAudioEventDetector(application)
 
     fun startAnalyzing() {
         if (!recorder.isRecording()) {

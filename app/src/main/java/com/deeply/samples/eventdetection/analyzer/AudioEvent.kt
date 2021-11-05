@@ -10,3 +10,14 @@ data class AudioEvent(
     /** 오디오 이벤트가 끝난 시간. 대략적인 시간으로, 엄밀하지 않을 수 있습니다. */
     val to: Calendar
 )
+
+enum class AudioEventType {
+    COUGH, 
+    SNEEZE,
+    NOSE,
+    BLOWING,
+    SCREAM,
+    PANT,
+    MOAN,
+    OTHERS
+}

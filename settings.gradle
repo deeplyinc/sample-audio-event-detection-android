@@ -8,3 +8,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Audio Event Detection Sample"
 include ':app'
+include ':librosa'
