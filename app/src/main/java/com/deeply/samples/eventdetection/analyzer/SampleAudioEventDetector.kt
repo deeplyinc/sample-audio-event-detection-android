@@ -44,9 +44,13 @@ class SampleAudioEventDetector(application: Application): AudioEventDetector {
             val aSecondAgo = Calendar.getInstance()
             aSecondAgo.add(Calendar.SECOND, -1)
             val now = Calendar.getInstance()
-            results.add(AudioEvent("sample audio event", aSecondAgo, now))
+            results.add(AudioEvent(AudioEventType.OTHERS, aSecondAgo, now))
         }
         return results.toList()
+    }
+
+    override fun clearResults() {
+        TODO("Not yet implemented")
     }
 
     private fun buildInput(preprocessed: Array<FloatArray>): IValue {

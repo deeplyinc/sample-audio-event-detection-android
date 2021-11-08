@@ -26,4 +26,9 @@ interface AudioEventDetector {
      * - to 만 null 인 경우: from 이후의 모든 결과
      */
     fun getResults(from: Calendar?, to: Calendar?): List<AudioEvent>
+
+    /**
+     * 지금까지 저장된 모든 분석 결과를 삭제합니다.
+     */
+    fun clearResults()
 }

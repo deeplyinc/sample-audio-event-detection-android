@@ -10,7 +10,6 @@ import androidx.lifecycle.viewModelScope
 import com.deeply.samples.eventdetection.analyzer.AudioEvent
 import com.deeply.samples.eventdetection.analyzer.AudioEventDetector
 import com.deeply.samples.eventdetection.analyzer.HomeAudioEventDetector
-import com.deeply.samples.eventdetection.analyzer.SampleAudioEventDetector
 import com.deeply.samples.eventdetection.recorder.DeeplyRecorder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
@@ -28,7 +27,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 인풋으로 받고, 충분한 오디오 데이터가 모일 경우 분석을 진행하여 그 결과를 모듈 내부에서 관리합니다. getResults() 함수를
      * 이용해 분석 결과를 List<AudioEvent> 형태로 얻을 수 있습니다.
      */
-//    private val detector: AudioEventDetector = SampleAudioEventDetector(application)
     private val detector: AudioEventDetector = HomeAudioEventDetector(application)
 
     fun startAnalyzing() {
@@ -37,7 +35,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                     // 녹음 시작, raw audio (audioSamples) 획득
                     recorder.start().collect { audioSamples ->
-                        Log.d(TAG, "analyze() - audioSamples.size: ${audioSamples.size}")
+                        Log.d(TAG, "Start analyzing - audioSamples.size: ${audioSamples.size}")
                         // raw audio 데이터를 detector 에 축적
                         detector.accumulate(audioSamples.map { it.toFloat() }.toFloatArray())
 
@@ -57,8 +55,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun isAnalyzing() = recorder.isRecording()
 
+    /**
+     * 주어진 시간대(from - to)의 분석 결과를 얻는 함수.
+     */
     fun getResult(from: Calendar?, to: Calendar?): List<AudioEvent> {
-        // 주어진 시간대(from - to)의 분석 결과를 얻는 함수.
         val result = detector.getResults(from, to)
         Log.d(TAG, "getResult() - ${result.size} results: $result")
         return result

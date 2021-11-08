@@ -16,7 +16,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.*
-import kotlin.random.Random
 
 class HomeAudioEventDetector(application: Application): AudioEventDetector {
     companion object {
@@ -25,10 +24,13 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
 
     private val app = application
     private var moduleEncoder: Module? = null
+    private val resultsBuffer = mutableListOf<AudioEvent>()
 
     init {
         try {
-            moduleEncoder = LiteModuleLoader.load(assetFilePath(app, "20211022-200000_vanilla_pytorch.ptl"))
+            // PyTorch 모델 파일(.ptl)을 assets 폴더에 넣은 후 파일 이름을 지정해주시면 됩니다.
+            moduleEncoder = LiteModuleLoader.load(
+                assetFilePath(app, "20211022-200000_vanilla_pytorch.ptl"))
         } catch (e: Exception) {
             Log.e(MainViewModel.TAG, "Failed to load PyTorch model file: ", e)
         }
@@ -36,26 +38,25 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
 
     override fun accumulate(audioSamples: FloatArray) {
         if (moduleEncoder != null) {
-            val preprocessed = preprocess(audioSamples)
-            for (preprocessedItem in preprocessed) {
+            // keep current time
+            val to = Calendar.getInstance()
+            val from = Calendar.getInstance()
+            from.add(Calendar.SECOND, -3)
 
-            }
+            // start inference
+            val preprocessed = preprocess(audioSamples)
             val modelInput = buildInput(preprocessed)
             val modelOutput = moduleEncoder?.forward(modelInput)
-            // logging
+
             if (modelOutput?.isTensor == true) {
                 val resultTensor = modelOutput.toTensor()
-                val resultData = resultTensor.dataAsFloatArray
-                Log.d(TAG, "accumulate: ${resultData.size}")
+                val resultData = resultTensor.dataAsFloatArray.take(AudioEventType.values().size)
 
-                if (resultData.size < AudioEventType.values().size) {
-                    Log.e(TAG, "accumulate: ")
-                    return
-                }
-                for (i in resultData.indices) {
-                    if (i < AudioEventType.values().size) {
-                        Log.d(TAG, "accumulate result: ${resultData[i]}")
-                    }
+                if (isValidResults(resultData)) {
+                    // printResult(resultData) // Uncomment if you need the detail results
+                    val audioEvent = buildAudioEvent(getLargestEvent(resultData), from, to)
+                    Log.d(TAG, "Analysis completed. Result: $audioEvent")
+                    accumulateResult(audioEvent)
                 }
             }
         }
@@ -63,16 +64,21 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
 
     override fun getResults(from: Calendar?, to: Calendar?): List<AudioEvent> {
         val results = mutableListOf<AudioEvent>()
-        val nResults = Random.nextInt(5)
-        for (i in 0..nResults) {
-            val aSecondAgo = Calendar.getInstance()
-            aSecondAgo.add(Calendar.SECOND, -1)
-            val now = Calendar.getInstance()
-            results.add(AudioEvent("sample audio event", aSecondAgo, now))
+        for (event in resultsBuffer) {
+            if ((from == null || event.from.after(from)) && (to == null || event.to.before(to))) {
+                results.add(event)
+            }
         }
         return results.toList()
     }
 
+    override fun clearResults() {
+        resultsBuffer.clear()
+    }
+
+    /**
+     * Preprocess the given audioSamples
+     */
     private fun preprocess(audioSamples: FloatArray): Array<Array<FloatArray>> {
         val logOffset = 1e-10
         val input = DoubleArray(audioSamples.size)
@@ -139,6 +145,9 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         return transposeLogMelResultWithChannelAdd
     }
 
+    /**
+     * Build input for PyTorch forward()
+     */
     private fun buildInput(preprocessedInputs: Array<Array<FloatArray>>): IValue {
         val buffer = Tensor.allocateFloatBuffer(2 * 1 * 47 * 64)
         for (preprocessedInput in preprocessedInputs) {
@@ -150,6 +159,58 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         }
         val tensor = Tensor.fromBlob(buffer, longArrayOf(2, 1, 47, 64))
         return IValue.from(tensor)
+    }
+
+    /**
+     * Store the inference results to the buffer in AudioEvent form
+     */
+    private fun accumulateResult(audioEvent: AudioEvent) {
+        resultsBuffer.add(audioEvent)
+    }
+
+    /**
+     * Get the event with the largest probability
+     */
+    private fun getLargestEvent(resultData: List<Float>): AudioEventType {
+        var largestIndex = 0
+        for (i in resultData.indices) {
+            val probability = resultData[i]
+
+            if (probability > resultData[largestIndex]) {
+                largestIndex = i
+            }
+        }
+        return AudioEventType.values()[largestIndex]
+    }
+
+    /**
+     * Build AudioEvent
+     */
+    private fun buildAudioEvent(audioEventType: AudioEventType, from: Calendar, to: Calendar): AudioEvent {
+        return AudioEvent(audioEventType, from, to)
+    }
+
+    /**
+     * Check the inference results are valid or not
+     */
+    private fun isValidResults(resultData: List<Float>): Boolean {
+        if (resultData.size < AudioEventType.values().size) {
+            Log.e(TAG, "Model outputs are less than predefined output types in AudioEventType.")
+            return false
+        }
+        return true
+    }
+
+    /**
+     * Print the inference results to Logcat
+     */
+    private fun printResult(resultData: List<Float>) {
+        Log.d(TAG, "Inference results")
+        for (i in resultData.indices) {
+            if (i < AudioEventType.values().size) {
+                Log.d(TAG, "- ${AudioEventType.values()[i].name}: ${resultData[i]}")
+            }
+        }
     }
 
     private fun assetFilePath(context: Context, assetName: String): String? {

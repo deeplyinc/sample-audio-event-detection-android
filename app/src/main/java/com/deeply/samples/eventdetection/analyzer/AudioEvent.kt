@@ -4,7 +4,7 @@ import java.util.*
 
 data class AudioEvent(
     /** 감지된 오디오 이벤트의 이름. */
-    val name: String,
+    val name: AudioEventType,
     /** 오디오 이벤트가 시작된 시간. 대략적인 시간으로, 엄밀하지 않을 수 있습니다. */
     val from: Calendar,
     /** 오디오 이벤트가 끝난 시간. 대략적인 시간으로, 엄밀하지 않을 수 있습니다. */
@@ -14,8 +14,7 @@ data class AudioEvent(
 enum class AudioEventType {
     COUGH, 
     SNEEZE,
-    NOSE,
-    BLOWING,
+    NOSE_BLOWING,
     SCREAM,
     PANT,
     MOAN,
