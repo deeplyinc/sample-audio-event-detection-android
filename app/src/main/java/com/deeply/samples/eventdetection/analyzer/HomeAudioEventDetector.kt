@@ -30,7 +30,7 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         try {
             // PyTorch 모델 파일(.ptl)을 assets 폴더에 넣은 후 파일 이름을 지정해주시면 됩니다.
             moduleEncoder = LiteModuleLoader.load(
-                assetFilePath(app, "20211022-200000_vanilla_pytorch.ptl"))
+                assetFilePath(app, "NonverbalClassifier_20211112.ptl"))
         } catch (e: Exception) {
             Log.e(MainViewModel.TAG, "Failed to load PyTorch model file: ", e)
         }
@@ -128,28 +128,27 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
             }
         }
 
-        // transpose
         if (logMelResult.isEmpty()) throw Exception()
 
-        val transposeLogMelResultWithChannelAdd = arrayOf(Array(logMelResult[0].size) { FloatArray(logMelResult.size) })
+        val channelAdded = arrayOf(Array(logMelResult.size) { FloatArray(logMelResult[0].size) })
         for (i in melResult.indices) {
             for (j in melResult[0].indices) {
-                transposeLogMelResultWithChannelAdd[0][j][i] = logMelResult[i][j]
+                channelAdded[0][i][j] = logMelResult[i][j]
             }
         }
 
         // build proper shape of input
-        if (transposeLogMelResultWithChannelAdd.isNotEmpty() && transposeLogMelResultWithChannelAdd[0].isNotEmpty()) {
-            Log.d(TAG, "Preprocessing complete. Shape: ${transposeLogMelResultWithChannelAdd.size} * ${transposeLogMelResultWithChannelAdd[0].size} * ${transposeLogMelResultWithChannelAdd[0][0].size}")
+        if (channelAdded.isNotEmpty() && channelAdded[0].isNotEmpty()) {
+            Log.d(TAG, "Preprocessing complete. Shape: ${channelAdded.size} * ${channelAdded[0].size} * ${channelAdded[0][0].size}")
         }
-        return transposeLogMelResultWithChannelAdd
+        return channelAdded
     }
 
     /**
      * Build input for PyTorch forward()
      */
     private fun buildInput(preprocessedInputs: Array<Array<FloatArray>>): IValue {
-        val buffer = Tensor.allocateFloatBuffer(2 * 1 * 47 * 64)
+        val buffer = Tensor.allocateFloatBuffer(2 * 1 * 64 * 47)
         for (preprocessedInput in preprocessedInputs) {
             for (xDim in preprocessedInput) {
                 for (yDim in xDim) {
@@ -157,7 +156,7 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
                 }
             }
         }
-        val tensor = Tensor.fromBlob(buffer, longArrayOf(2, 1, 47, 64))
+        val tensor = Tensor.fromBlob(buffer, longArrayOf(2, 1, 64, 47))
         return IValue.from(tensor)
     }
 
