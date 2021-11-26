@@ -3,8 +3,6 @@ package com.deeply.samples.eventdetection.analyzer
 import android.app.Application
 import android.content.Context
 import android.util.Log
-import com.deeply.library.librosa.HammingWindowFunction
-import com.deeply.library.librosa.StandardScaler
 import com.deeply.library.librosa.feature.MelSpectrogram
 import com.deeply.samples.eventdetection.MainViewModel
 import org.apache.commons.math3.util.FastMath
@@ -79,36 +77,10 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
     /**
      * Preprocess the given audioSamples
      */
-    private fun preprocess(audioSamples: FloatArray): Array<Array<FloatArray>> {
-        val logOffset = 1e-10
+    private fun preprocess(audioSamples: FloatArray): Array<FloatArray> {
         val input = DoubleArray(audioSamples.size)
         for (i in audioSamples.indices) {
             input[i] = audioSamples[i].toDouble()
-        }
-
-        // Hamming window
-        val windowFunction = HammingWindowFunction(audioSamples.size)
-        windowFunction.applyFunction(input)
-
-        // For backward compatibility
-        var dimAddInput = Array(1) {
-            DoubleArray(
-                input.size
-            )
-        } // [numOfSample][numOfFeature]
-        for (i in dimAddInput.indices) {
-            for (j in dimAddInput[0].indices) {
-                dimAddInput[i][j] = input[j]
-            }
-        }
-        val scaler = StandardScaler()
-        dimAddInput = scaler.scale(dimAddInput)
-
-        // For backward compatibility
-        for (i in dimAddInput.indices) {
-            for (j in dimAddInput[0].indices) {
-                input[j] = dimAddInput[i][j]
-            }
         }
 
         val melResult: Array<FloatArray> = MelSpectrogram.createMelSpectrogram(
@@ -117,6 +89,8 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         )
 
         // log mel-spectrogram
+        val logOffset = 1e-10
+        val multiplier = 10.0F
         val logMelResult = Array(melResult.size) {
             FloatArray(
                 melResult[0].size
@@ -124,7 +98,7 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         }
         for (i in melResult.indices) {
             for (j in melResult[0].indices) {
-                logMelResult[i][j] = FastMath.log(melResult[i][j] + logOffset).toFloat()
+                logMelResult[i][j] = multiplier * FastMath.log10(melResult[i][j] + logOffset).toFloat()
             }
         }
 
@@ -137,23 +111,19 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
             }
         }
 
-        // build proper shape of input
-        if (channelAdded.isNotEmpty() && channelAdded[0].isNotEmpty()) {
-            Log.d(TAG, "Preprocessing complete. Shape: ${channelAdded.size} * ${channelAdded[0].size} * ${channelAdded[0][0].size}")
-        }
-        return channelAdded
+        Log.d(TAG, "Preprocessing complete. Shape: ${logMelResult.size} * ${logMelResult[0].size}")
+
+        return logMelResult
     }
 
     /**
      * Build input for PyTorch forward()
      */
-    private fun buildInput(preprocessedInputs: Array<Array<FloatArray>>): IValue {
+    private fun buildInput(preprocessedInputs: Array<FloatArray>): IValue {
         val buffer = Tensor.allocateFloatBuffer(2 * 1 * 64 * 47)
-        for (preprocessedInput in preprocessedInputs) {
-            for (xDim in preprocessedInput) {
-                for (yDim in xDim) {
-                    buffer.put(yDim)
-                }
+        for (i in preprocessedInputs.indices) {
+            for (j in preprocessedInputs[i].indices) {
+                buffer.put(preprocessedInputs[i][j])
             }
         }
         val tensor = Tensor.fromBlob(buffer, longArrayOf(2, 1, 64, 47))
