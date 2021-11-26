@@ -12,13 +12,19 @@ import java.util.*
  * 있습니다.
  */
 interface AudioEventDetector {
+    companion object {
+        const val SAMPLE_RATE = 16000
+        const val MODEL_INPUT_SAMPLE_SIZE = 48000
+    }
+
     /**
      * raw audio 데이터를 축적합니다.
      */
-    fun accumulate(audioSamples: FloatArray)
+    fun accumulate(inputAudioSamples: FloatArray)
 
     /**
      * 저장된 분석 결과를 리턴합니다.
+     * threshold 값으로 최소 확률값을 조절할 수 있습니다.
      * from, to 값에 따라 리턴하는 결과물을 제한할 수 있습니다.
      *
      * - from, to 가 모두 null 인 경우: 전체 분석 결과

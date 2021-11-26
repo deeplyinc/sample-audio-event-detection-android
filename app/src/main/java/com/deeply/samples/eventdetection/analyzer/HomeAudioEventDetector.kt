@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import com.deeply.library.librosa.feature.MelSpectrogram
 import com.deeply.samples.eventdetection.MainViewModel
+import org.apache.commons.collections4.queue.CircularFifoQueue
 import org.apache.commons.math3.util.FastMath
 import org.pytorch.IValue
 import org.pytorch.LiteModuleLoader
@@ -18,11 +19,17 @@ import java.util.*
 class HomeAudioEventDetector(application: Application): AudioEventDetector {
     companion object {
         private const val TAG = "HomeAudioEventDetector"
+
+        private const val MODEL_PARAM_N_FFT = 2048
+        private const val MODEL_PARAM_HOP_LENGTH = 1024
     }
 
     private val app = application
-    private var moduleEncoder: Module? = null
+    private val audioBuffer = CircularFifoQueue<Float>(AudioEventDetector.MODEL_INPUT_SAMPLE_SIZE)
     private val resultsBuffer = mutableListOf<AudioEvent>()
+
+    private var moduleEncoder: Module? = null
+
 
     init {
         try {
@@ -34,28 +41,32 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         }
     }
 
-    override fun accumulate(audioSamples: FloatArray) {
-        if (moduleEncoder != null) {
-            // keep current time
-            val to = Calendar.getInstance()
-            val from = Calendar.getInstance()
-            from.add(Calendar.SECOND, -3)
+    override fun accumulate(inputAudioSamples: FloatArray) {
+        audioBuffer.addAll(inputAudioSamples.asList())
 
-            // start inference
-            val preprocessed = preprocess(audioSamples)
-            val modelInput = buildInput(preprocessed)
-            val modelOutput = moduleEncoder?.forward(modelInput)
+        if (audioBuffer.size < AudioEventDetector.MODEL_INPUT_SAMPLE_SIZE) return
+        if (moduleEncoder == null) return
 
-            if (modelOutput?.isTensor == true) {
-                val resultTensor = modelOutput.toTensor()
-                val resultData = resultTensor.dataAsFloatArray.take(AudioEventType.values().size)
+        // keep current time
+        val to = Calendar.getInstance()
+        val from = Calendar.getInstance()
+        from.add(Calendar.SECOND, -(AudioEventDetector.MODEL_INPUT_SAMPLE_SIZE / AudioEventDetector.SAMPLE_RATE))
 
-                if (isValidResults(resultData)) {
-                    // printResult(resultData) // Uncomment if you need the detail results
-                    val audioEvent = buildAudioEvent(getLargestEvent(resultData), from, to)
-                    Log.d(TAG, "Analysis completed. Result: $audioEvent")
-                    accumulateResult(audioEvent)
-                }
+        // start inference
+        val audioSamples = audioBuffer.toFloatArray()
+        val preprocessed = preprocess(audioSamples)
+        val modelInput = buildInput(preprocessed)
+        val modelOutput = moduleEncoder?.forward(modelInput)
+
+        if (modelOutput?.isTensor == true) {
+            val resultTensor = modelOutput.toTensor()
+            val resultData = resultTensor.dataAsFloatArray.take(AudioEventType.values().size)
+
+            if (isValidResults(resultData)) {
+                // printResult(resultData) // Uncomment if you need the detail results
+                val audioEvent = buildAudioEvent(resultData, from ,to)
+                Log.d(TAG, "Analysis completed. Result: $audioEvent")
+                accumulateResult(audioEvent)
             }
         }
     }
@@ -84,7 +95,7 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         }
 
         val melResult: Array<FloatArray> = MelSpectrogram.createMelSpectrogram(
-            input, 16000, null, 2048, 1024,
+            input, AudioEventDetector.SAMPLE_RATE, null, MODEL_PARAM_N_FFT, MODEL_PARAM_HOP_LENGTH,
             null, null, null, null, null
         )
 
@@ -104,14 +115,7 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
 
         if (logMelResult.isEmpty()) throw Exception()
 
-        val channelAdded = arrayOf(Array(logMelResult.size) { FloatArray(logMelResult[0].size) })
-        for (i in melResult.indices) {
-            for (j in melResult[0].indices) {
-                channelAdded[0][i][j] = logMelResult[i][j]
-            }
-        }
-
-        Log.d(TAG, "Preprocessing complete. Shape: ${logMelResult.size} * ${logMelResult[0].size}")
+        // Log.d(TAG, "Preprocessing complete. Shape: ${logMelResult.size} * ${logMelResult[0].size}")
 
         return logMelResult
     }
@@ -140,23 +144,30 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
     /**
      * Get the event with the largest probability
      */
-    private fun getLargestEvent(resultData: List<Float>): AudioEventType {
+    private fun getLargestEvent(resultData: List<Float>): Pair<AudioEventType, Float> {
         var largestIndex = 0
+        var largestConfidence = resultData[largestIndex]
         for (i in resultData.indices) {
             val probability = resultData[i]
 
-            if (probability > resultData[largestIndex]) {
+            if (probability > largestConfidence) {
                 largestIndex = i
+                largestConfidence = probability
             }
         }
-        return AudioEventType.values()[largestIndex]
+        return Pair(AudioEventType.values()[largestIndex], largestConfidence)
     }
 
     /**
      * Build AudioEvent
      */
-    private fun buildAudioEvent(audioEventType: AudioEventType, from: Calendar, to: Calendar): AudioEvent {
-        return AudioEvent(audioEventType, from, to)
+    private fun buildAudioEvent(resultData: List<Float>, from: Calendar, to: Calendar): AudioEvent {
+        val totalResultMap = AudioEventType.values()
+            .map { it.name }
+            .zip(resultData)
+            .toMap()
+        val (largestEvent, confidence) = getLargestEvent(resultData)
+        return AudioEvent(largestEvent, confidence, from, to, totalResultMap)
     }
 
     /**

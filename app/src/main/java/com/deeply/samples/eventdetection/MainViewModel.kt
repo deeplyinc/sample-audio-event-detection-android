@@ -21,7 +21,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 녹음 모듈. AudioRecord 를 Kotlin Flow 로 사용할 수 있도록 감싼 wrapper 로, 이 모듈을 사용하지 않아도 상관없습니다.
      * AudioEventDetector 가 FloatArray 형태의 raw audio 를 인풋으로 받는 형태이기 때문에 이것만 맞춰주시면 됩니다.
      */
-    private val recorder = DeeplyRecorder(bufferSize = 48000)
+    private val recorder = DeeplyRecorder(bufferSize = AudioEventDetector.SAMPLE_RATE)
     /**
      * 녹음된 raw audio 데이터 기반으로 오디오 이벤트를 분석, 감지하는 모듈. accumulate() 함수를 이용해 raw audio 를
      * 인풋으로 받고, 충분한 오디오 데이터가 모일 경우 분석을 진행하여 그 결과를 모듈 내부에서 관리합니다. getResults() 함수를
@@ -35,7 +35,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                     // 녹음 시작, raw audio (audioSamples) 획득
                     recorder.start().collect { audioSamples ->
-                        Log.d(TAG, "Start analyzing - audioSamples.size: ${audioSamples.size}")
+                        // Log.d(TAG, "Start analyzing - audioSamples.size: ${audioSamples.size}")
+
                         // raw audio 데이터를 detector 에 축적
                         detector.accumulate(audioSamples.map { it.toFloat() }.toFloatArray())
 
@@ -59,9 +60,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 주어진 시간대(from - to)의 분석 결과를 얻는 함수.
      */
     fun getResult(from: Calendar?, to: Calendar?): List<AudioEvent> {
-        val result = detector.getResults(from, to)
-        Log.d(TAG, "getResult() - ${result.size} results: $result")
-        return result
+        val threshold = 0.7F
+        val results = detector.getResults(from, to)
+            .filter { it.confidence >= threshold }
+        Log.d(TAG, "getResult() - ${results.size} results: $results")
+        return results
     }
 
     companion object {
