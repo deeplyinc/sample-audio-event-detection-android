@@ -35,7 +35,7 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         try {
             // PyTorch 모델 파일(.ptl)을 assets 폴더에 넣은 후 파일 이름을 지정해주시면 됩니다.
             moduleEncoder = LiteModuleLoader.load(
-                assetFilePath(app, "NonverbalClassifier_20211112.ptl"))
+                assetFilePath(app, "NonverbalClassifier_20211130.ptl"))
         } catch (e: Exception) {
             Log.e(MainViewModel.TAG, "Failed to load PyTorch model file: ", e)
         }
@@ -89,10 +89,9 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
      * Preprocess the given audioSamples
      */
     private fun preprocess(audioSamples: FloatArray): Array<FloatArray> {
-        val input = DoubleArray(audioSamples.size)
-        for (i in audioSamples.indices) {
-            input[i] = audioSamples[i].toDouble()
-        }
+        // adjust the scale of audio sample
+        val scaledInput = scaleToFloatRange(audioSamples)
+        val input = scaledInput.map { it.toDouble() }.toDoubleArray()
 
         val melResult: Array<FloatArray> = MelSpectrogram.createMelSpectrogram(
             input, AudioEventDetector.SAMPLE_RATE, null, MODEL_PARAM_N_FFT, MODEL_PARAM_HOP_LENGTH,
@@ -214,5 +213,11 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
             Log.e(MainViewModel.TAG, assetName + ": " + e.localizedMessage)
         }
         return null
+    }
+
+    private fun scaleToFloatRange(data: FloatArray): List<Float> {
+        return data.map {
+            it / 32768.0F
+        }
     }
 }
