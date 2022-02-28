@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import com.deeply.library.librosa.feature.MelSpectrogram
 import com.deeply.samples.eventdetection.MainViewModel
+import org.apache.commons.collections4.QueueUtils
 import org.apache.commons.collections4.queue.CircularFifoQueue
 import org.apache.commons.math3.util.FastMath
 import org.pytorch.IValue
@@ -15,6 +16,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.*
+import java.util.concurrent.CopyOnWriteArrayList
 
 class HomeAudioEventDetector(application: Application): AudioEventDetector {
     companion object {
@@ -25,8 +27,8 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
     }
 
     private val app = application
-    private val audioBuffer = CircularFifoQueue<Float>(AudioEventDetector.MODEL_INPUT_SAMPLE_SIZE)
-    private val resultsBuffer = mutableListOf<AudioEvent>()
+    private val audioBuffer = QueueUtils.synchronizedQueue(CircularFifoQueue<Float>(AudioEventDetector.MODEL_INPUT_SAMPLE_SIZE))
+    private val resultsBuffer = CopyOnWriteArrayList<AudioEvent>()
 
     private var moduleEncoder: Module? = null
 
@@ -42,31 +44,33 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
     }
 
     override fun accumulate(inputAudioSamples: FloatArray) {
-        audioBuffer.addAll(inputAudioSamples.asList())
+        synchronized(audioBuffer) {
+            audioBuffer.addAll(inputAudioSamples.asList())
 
-        if (audioBuffer.size < AudioEventDetector.MODEL_INPUT_SAMPLE_SIZE) return
-        if (moduleEncoder == null) return
+            if (audioBuffer.size < AudioEventDetector.MODEL_INPUT_SAMPLE_SIZE) return
+            if (moduleEncoder == null) return
 
-        // keep current time
-        val to = Calendar.getInstance()
-        val from = Calendar.getInstance()
-        from.add(Calendar.SECOND, -(AudioEventDetector.MODEL_INPUT_SAMPLE_SIZE / AudioEventDetector.SAMPLE_RATE))
+            // keep current time
+            val to = Calendar.getInstance()
+            val from = Calendar.getInstance()
+            from.add(Calendar.SECOND, -(AudioEventDetector.MODEL_INPUT_SAMPLE_SIZE / AudioEventDetector.SAMPLE_RATE))
 
-        // start inference
-        val audioSamples = audioBuffer.toFloatArray()
-        val preprocessed = preprocess(audioSamples)
-        val modelInput = buildInput(preprocessed)
-        val modelOutput = moduleEncoder?.forward(modelInput)
+            // start inference
+            val audioSamples = audioBuffer.toFloatArray()
+            val preprocessed = preprocess(audioSamples)
+            val modelInput = buildInput(preprocessed)
+            val modelOutput = moduleEncoder?.forward(modelInput)
 
-        if (modelOutput?.isTensor == true) {
-            val resultTensor = modelOutput.toTensor()
-            val resultData = resultTensor.dataAsFloatArray.take(AudioEventType.values().size)
+            if (modelOutput?.isTensor == true) {
+                val resultTensor = modelOutput.toTensor()
+                val resultData = resultTensor.dataAsFloatArray.take(AudioEventType.values().size)
 
-            if (isValidResults(resultData)) {
-                // printResult(resultData) // Uncomment if you need the detail results
-                val audioEvent = buildAudioEvent(resultData, from ,to)
-                Log.d(TAG, "Analysis completed. Result: $audioEvent")
-                accumulateResult(audioEvent)
+                if (isValidResults(resultData)) {
+                    // printResult(resultData) // Uncomment if you need the detail results
+                    val audioEvent = buildAudioEvent(resultData, from ,to)
+                    Log.d(TAG, "Analysis completed. Result: $audioEvent")
+                    accumulateResult(audioEvent)
+                }
             }
         }
     }
