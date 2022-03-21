@@ -17,6 +17,8 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 class HomeAudioEventDetector(application: Application): AudioEventDetector {
     companion object {
@@ -37,7 +39,7 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         try {
             // PyTorch 모델 파일(.ptl)을 assets 폴더에 넣은 후 파일 이름을 지정해주시면 됩니다.
             moduleEncoder = LiteModuleLoader.load(
-                assetFilePath(app, "NonverbalClassifier_20211130.ptl"))
+                assetFilePath(app, "elderly_220321_7class.ptl"))
         } catch (e: Exception) {
             Log.e(MainViewModel.TAG, "Failed to load PyTorch model file: ", e)
         }
@@ -66,7 +68,7 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
                 val resultData = resultTensor.dataAsFloatArray.take(AudioEventType.values().size)
 
                 if (isValidResults(resultData)) {
-                    // printResult(resultData) // Uncomment if you need the detail results
+//                    printResult(resultData) // Uncomment if you need the detail results
                     val audioEvent = buildAudioEvent(resultData, from ,to)
                     Log.d(TAG, "Analysis completed. Result: $audioEvent")
                     accumulateResult(audioEvent)
@@ -93,13 +95,32 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
      * Preprocess the given audioSamples
      */
     private fun preprocess(audioSamples: FloatArray): Array<FloatArray> {
-        // adjust the scale of audio sample
+        // 마이크에서 오디오 샘플 인풋이 들어올 때는 short 자료형으로 들어오기 때문에 scaling 적용을 해주어야 함
+        // 반면 테스트 등을 목적으로 .wav 등의 파일 형태로 인풋이 들어올 때는 이미 scaling 적용이 된 형태이기 때문에 따로 scale 해줄 필요가 없음
         val scaledInput = scaleToFloatRange(audioSamples)
         val input = scaledInput.map { it.toDouble() }.toDoubleArray()
 
+        // standardization
+        val avg = input.average()
+        val variance = input.map {
+            it.minus(avg).pow(2.0)
+        }.average()
+        val std = sqrt(variance)
+        val standardizedInput = input.map {
+            (it - avg) / (std)
+        }
+
         val melResult: Array<FloatArray> = MelSpectrogram.createMelSpectrogram(
-            input, AudioEventDetector.SAMPLE_RATE, null, MODEL_PARAM_N_FFT, MODEL_PARAM_HOP_LENGTH,
-            null, null, null, null, null
+            standardizedInput.toDoubleArray(),
+            AudioEventDetector.SAMPLE_RATE,
+            null,
+            MODEL_PARAM_N_FFT,
+            MODEL_PARAM_HOP_LENGTH,
+            null,
+            null,
+            null,
+            null,
+            null
         )
 
         // log mel-spectrogram

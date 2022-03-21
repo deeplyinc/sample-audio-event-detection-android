@@ -12,7 +12,6 @@ import com.deeply.samples.eventdetection.analyzer.AudioEventDetector
 import com.deeply.samples.eventdetection.analyzer.HomeAudioEventDetector
 import com.deeply.samples.eventdetection.recorder.DeeplyRecorder
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.*
 
@@ -65,6 +64,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .filter { it.confidence >= threshold }
         Log.d(TAG, "getResult() - ${results.size} results: $results")
         return results
+    }
+
+    fun clearResult() {
+        detector.clearResults()
     }
 
     companion object {

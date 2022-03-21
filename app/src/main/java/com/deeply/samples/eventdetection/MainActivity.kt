@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity() {
             beforeTenMinute.add(Calendar.MINUTE, -10)
             val now = Calendar.getInstance()
             viewModel.getResult(from = beforeTenMinute, to = now)
+            viewModel.clearResult()
         }
     }
 
