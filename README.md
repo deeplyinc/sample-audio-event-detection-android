@@ -10,7 +10,7 @@
 
 ```
 // PyTorch Lite
-implementation "org.pytorch:pytorch_android_lite:1.9.0"
+implementation "org.pytorch:pytorch_android_lite:1.12"
 
 // Apache Commons Math
 implementation "org.apache.commons:commons-math3:3.6.1"
