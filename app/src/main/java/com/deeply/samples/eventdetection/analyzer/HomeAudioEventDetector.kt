@@ -107,7 +107,7 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
         }.average()
         val std = sqrt(variance)
         val standardizedInput = input.map {
-            (it - avg) / (std)
+            (it - avg) / (std + 1e-8)
         }
 
         val melResult: Array<FloatArray> = MelSpectrogram.createMelSpectrogram(
