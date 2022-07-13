@@ -46,6 +46,15 @@ class HomeAudioEventDetector(application: Application): AudioEventDetector {
     }
 
     override fun accumulate(inputAudioSamples: FloatArray) {
+        if (inputAudioSamples.isEmpty()) {
+            Log.w(TAG, "Empty audio samples are passes.")
+            return
+        }
+        if (inputAudioSamples.none { it != 0.0F }) {
+            Log.w(TAG, "All of audio samples (total ${inputAudioSamples.size} samples) has zero value.")
+            return
+        }
+
         synchronized(audioBuffer) {
             audioBuffer.addAll(inputAudioSamples.asList())
 
